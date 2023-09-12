@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@types/node": "^20.6.0",
+    "@types/three": "^0.156.0",
+    "ts-loader": "^9.4.4"
+  },
+  "dependencies": {
+    "three": "^0.156.1"
+  }
+}
