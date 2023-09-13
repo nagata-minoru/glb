@@ -1,13 +1,16 @@
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { GLTFLoader, GLTF } from "three/examples/jsm/loaders/GLTFLoader";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { OBB } from 'three/examples/jsm/math/OBB';
 
 (async () => {
   let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer;
-  let texturedCube: THREE.Mesh, loadedModel: THREE.Group, plane: THREE.Mesh;
+  let texturedCube: THREE.Mesh, loadedModel: GLTF, plane: THREE.Mesh;
   let modelGroup: THREE.Group, controls: OrbitControls;
   let gridHelper: THREE.GridHelper, axesHelper: THREE.AxesHelper;
   let light: THREE.DirectionalLight, ambient: THREE.AmbientLight;
+  let obb: OBB;
+  let obbHelper: THREE.Box3Helper;
 
   /**
    * シーンを初期化します。
@@ -25,8 +28,12 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
     loadedModel = await loadModel();
 
+    // モデルがロードされた後にOBBを作成
+    [obb, obbHelper] = createOBB(loadedModel);
+    scene.add(obbHelper);
+
     modelGroup = new THREE.Group();
-    modelGroup.add(loadedModel);
+    modelGroup.add(loadedModel.scene);
 
     scene.add(modelGroup);
 
@@ -110,24 +117,35 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
    * モデルをロードします。
    * @returns {Promise<THREE.Group>} ロードされたモデル。
    */
-  const loadModel = async (): Promise<THREE.Group> => {
+  const loadModel = async (): Promise<GLTF> => {
     const loader = new GLTFLoader();
-    const model = await new Promise<THREE.Group>((resolve) =>
+    const model = await new Promise<GLTF>((resolve) =>
       loader.load(
         "./ennchuBaoundingBox.glb",
-        (object) => resolve(object.scene),
+        (object) => resolve(object),
         undefined,
         (error) => console.log(error)
       )
     );
 
-    model.traverse((child) => {
+    model.scene.traverse((child: THREE.Object3D) => {
       child.castShadow = true;
     });
 
-    model.scale.set(50, 50, 50);
+    model.scene.scale.set(50, 50, 50);
 
     return model;
+  };
+
+  const createOBB = (model: GLTF): [OBB, THREE.Box3Helper] => {
+    const box = new THREE.Box3();
+    const group = model.scene;
+    box.setFromObject(group);
+    console.log(box.min, box.max); // これで AABB の最小と最大の座標が得られるよ！✨
+    const obb = new OBB();
+    obb.fromBox3(box);
+    const helper = new THREE.Box3Helper(box, new THREE.Color(0xffff00)); // 0xffff00 は黄色
+    return [obb, helper];
   };
 
   /**
@@ -150,14 +168,62 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
     renderer.render(scene, camera);
   };
 
+  // Matrix4 を作成
+  const rotationMatrix4 = new THREE.Matrix4();
+
+  // X軸を中心に0.001回転
+  rotationMatrix4.makeRotationAxis(new THREE.Vector3(1, 0, 0), 0.001);
+
+  // Y軸を中心に0.001回転
+  rotationMatrix4.makeRotationAxis(new THREE.Vector3(0, 1, 0), 0.001);
+
+  // Z軸を中心に0.001回転
+  rotationMatrix4.makeRotationAxis(new THREE.Vector3(0, 0, 1), 0.001);
+
+  // Matrix4 を Matrix3 に変換
+  const rotationMatrix3 = new THREE.Matrix3().setFromMatrix4(rotationMatrix4);
+
   /**
    * オブジェクトをアニメーションさせます。
    * キューブとモデルを回転させ、バウンディングボックスヘルパーを更新します。
    */
   const animateObjects = () => {
+    // OBB の rotation を更新
+    obb.rotation.multiply(rotationMatrix3);
+
+    // 古い obbHelper を scene から削除
+    scene.remove(obbHelper);
+
+    // OBB の中心点を取得
+    const center = obb.center; // 仮に position プロパティが OBB の中心点を保持しているとする
+
+    // OBB のサイズを取得
+    const size = new THREE.Vector3();
+    obb.getSize(size);
+
+    // Box3 の最小と最大の座標を計算
+    const min = new THREE.Vector3(
+      center.x - size.x / 2,
+      center.y - size.y / 2,
+      center.z - size.z / 2
+    );
+
+    const max = new THREE.Vector3(
+      center.x + size.x / 2,
+      center.y + size.y / 2,
+      center.z + size.z / 2
+    );
+
+    // 新しい Box3 オブジェクトを作成
+    const box3 = new THREE.Box3(min, max);
+
     modelGroup.rotation.x += 0.001;
     modelGroup.rotation.y += 0.001;
     modelGroup.rotation.z += 0.001;
+
+    obbHelper = new THREE.Box3Helper(box3, new THREE.Color(0xffff00));
+    obbHelper.applyMatrix4(modelGroup.matrixWorld)
+    scene.add(obbHelper);
   };
 
   window.onresize = handleResize;
