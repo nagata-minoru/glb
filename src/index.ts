@@ -141,10 +141,10 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     const box = new THREE.Box3();
     const group = model.scene;
     box.setFromObject(group);
-    console.log(box.min, box.max); // これで AABB の最小と最大の座標が得られるよ！✨
     const obb = new OBB();
     obb.fromBox3(box);
     const helper = new THREE.Box3Helper(box, new THREE.Color(0xffff00)); // 0xffff00 は黄色
+
     return [obb, helper];
   };
 
@@ -191,39 +191,12 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     // OBB の rotation を更新
     obb.rotation.multiply(rotationMatrix3);
 
-    // 古い obbHelper を scene から削除
-    scene.remove(obbHelper);
-
-    // OBB の中心点を取得
-    const center = obb.center; // 仮に position プロパティが OBB の中心点を保持しているとする
-
-    // OBB のサイズを取得
-    const size = new THREE.Vector3();
-    obb.getSize(size);
-
-    // Box3 の最小と最大の座標を計算
-    const min = new THREE.Vector3(
-      center.x - size.x / 2,
-      center.y - size.y / 2,
-      center.z - size.z / 2
-    );
-
-    const max = new THREE.Vector3(
-      center.x + size.x / 2,
-      center.y + size.y / 2,
-      center.z + size.z / 2
-    );
-
-    // 新しい Box3 オブジェクトを作成
-    const box3 = new THREE.Box3(min, max);
-
     modelGroup.rotation.x += 0.001;
     modelGroup.rotation.y += 0.001;
     modelGroup.rotation.z += 0.001;
-
-    obbHelper = new THREE.Box3Helper(box3, new THREE.Color(0xffff00));
-    obbHelper.applyMatrix4(modelGroup.matrixWorld)
-    scene.add(obbHelper);
+    obbHelper.rotation.x += 0.001;
+    obbHelper.rotation.y += 0.001;
+    obbHelper.rotation.z += 0.001;
   };
 
   window.onresize = handleResize;
