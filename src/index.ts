@@ -11,6 +11,7 @@ import { OBB } from 'three/examples/jsm/math/OBB';
   let light: THREE.DirectionalLight, ambient: THREE.AmbientLight;
   let obb: OBB;
   let obbHelper: THREE.Box3Helper;
+  let sphere: THREE.Mesh;
 
   /**
    * シーンを初期化します。
@@ -30,10 +31,10 @@ import { OBB } from 'three/examples/jsm/math/OBB';
 
     // モデルがロードされた後にOBBを作成
     [obb, obbHelper] = createOBB(loadedModel);
-    scene.add(obbHelper);
 
     modelGroup = new THREE.Group();
-    modelGroup.add(loadedModel.scene);
+    modelGroup.add(loadedModel.scene, obbHelper);
+    modelGroup.userData.obb = obb;
 
     scene.add(modelGroup);
 
@@ -59,6 +60,18 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     scene.add(ambient);
 
     plane.receiveShadow = true;
+
+    // 球体を作成
+    const geometry = new THREE.SphereGeometry(1, 32, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+    sphere = new THREE.Mesh(geometry, material);
+    sphere.castShadow = true;
+
+    sphere.userData.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
+
+    sphere.position.y = 30;
+    scene.add(sphere);
   };
 
   /**
@@ -168,6 +181,11 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     renderer.render(scene, camera);
   };
 
+  // 球体の初期位置
+  let xPosition = 0;
+  // 球体の移動速度
+  let speed = 0.5;
+
   // Matrix4 を作成
   const rotationMatrix4 = new THREE.Matrix4();
 
@@ -188,15 +206,27 @@ import { OBB } from 'three/examples/jsm/math/OBB';
    * キューブとモデルを回転させ、バウンディングボックスヘルパーを更新します。
    */
   const animateObjects = () => {
-    // OBB の rotation を更新
-    obb.rotation.multiply(rotationMatrix3);
+    // 球体を左右に動かす
+    xPosition += speed;
+    if (xPosition > 150 || xPosition < -150) {
+      // 範囲外に出たら速度を反転
+      speed *= -1;
+    }
+    sphere.position.x = xPosition;
 
     modelGroup.rotation.x += 0.001;
     modelGroup.rotation.y += 0.001;
     modelGroup.rotation.z += 0.001;
-    obbHelper.rotation.x += 0.001;
-    obbHelper.rotation.y += 0.001;
-    obbHelper.rotation.z += 0.001;
+
+    modelGroup.userData.obb.applyMatrix4(modelGroup.matrixWorld);
+
+    sphere.userData.boundingSphere.center.copy(sphere.position);
+
+    if (modelGroup.userData.obb.intersectsSphere(sphere.userData.boundingSphere)) {
+      (sphere.material as THREE.MeshBasicMaterial).color.set(0xff0000);
+    } else {
+      (sphere.material as THREE.MeshBasicMaterial).color.set(0x00ff00);
+    }
   };
 
   window.onresize = handleResize;
