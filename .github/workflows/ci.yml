@@ -1,0 +1,29 @@
+# PR と main への push のたびに、型チェックとビルドが通るかを確認する
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: 型チェック
+        run: npx tsc --noEmit
+
+      - name: ビルド
+        run: npx webpack
