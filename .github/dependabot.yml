@@ -8,6 +8,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 14
+    # TypeScript 7 は JavaScript の API がなく ts-loader が動かないので、メジャー更新は受け取らない
+    ignore:
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     groups:
       dependencies:
         patterns: ['*']
