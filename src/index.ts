@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { GLTFLoader, GLTF } from "three/examples/jsm/loaders/GLTFLoader";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import { OBB } from 'three/examples/jsm/math/OBB';
+import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { OBB } from 'three/addons/math/OBB.js';
 
 (async () => {
   let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer;
