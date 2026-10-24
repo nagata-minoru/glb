@@ -15,7 +15,6 @@ three.js で GLB モデルを読み込み、そのモデルを囲む OBB（Orien
 ## 必要な環境
 
 - Node.js 26.12.1（`.nvmrc` と `.tool-versions` で指定しています）
-- ブラウザで `index.html` を開くための静的サーバー（VS Code の Live Server など）
 
 ## セットアップ
 
@@ -23,13 +22,21 @@ three.js で GLB モデルを読み込み、そのモデルを囲む OBB（Orien
 npm install
 ```
 
+## 開発サーバー
+
+```sh
+npm run dev
+```
+
+Vite の開発サーバーが起動します（`http://localhost:5173/`）。ソースを保存すると、ブラウザに自動で反映されます。
+
 ## ビルド
 
 ```sh
 npm run build
 ```
 
-`src/index.ts` がバンドルされ、`dist/main.js` に出力されます。`dist/main.js` もリポジトリで管理しています。
+`dist/` にビルド結果が出力されます。ビルド結果を手元で確認するときは `npm run preview` を使います。
 
 型チェックだけを行う場合は次のコマンドを使います。
 
@@ -43,33 +50,30 @@ npm run typecheck
 npm test
 ```
 
-`src/collision.ts`（OBB の作成、ワールド座標への変換、球の配置、往復運動）のテストを、Node.js 標準のテストランナー（`node --test`）で実行します。テストは `test/` にあります。
+`src/collision.ts`（OBB の作成、ワールド座標への変換、球の配置、往復運動）のテストを Vitest で実行します。テストは `test/` にあります。
 
-PR と `main` への push のたびに、GitHub Actions で型チェック・テスト・ビルドを実行します（`.github/workflows/ci.yml`）。
+## CI と公開
 
-## 実行
-
-GLB ファイルを読み込むため、`index.html` をファイルとして直接開くのではなく、静的サーバー経由で開いてください。
-
-VS Code の Live Server を使う場合は、`index.html` を開いて「Go Live」を押すと `http://127.0.0.1:5501/` で表示されます。
+- **CI**（`.github/workflows/ci.yml`）：PR と `main` への push のたびに、型チェック・テスト・ビルドを実行します。
+- **公開**（`.github/workflows/deploy.yml`）：`main` に push されると、ビルドした `dist/` を GitHub Pages（https://nagata-minoru.github.io/glb/）に公開します。
 
 ## ファイル構成
 
 | パス | 内容 |
 |---|---|
+| `index.html` | ページ本体。`src/index.ts` を読み込む |
 | `src/index.ts` | シーンの構築、アニメーション、衝突判定 |
 | `src/collision.ts` | OBB や球の配置など、描画に依存しない計算 |
 | `test/` | テスト |
-| `dist/main.js` | ビルド結果 |
-| `index.html` | `dist/main.js` を読み込むページ |
-| `ennchuBaoundingBox.glb` | 表示する GLB モデル |
-| `webpack.config.js` | webpack の設定（ts-loader を使用） |
+| `public/` | そのまま配信するファイル（GLB モデル） |
+| `vite.config.ts` | Vite と Vitest の設定 |
 | `tsconfig.json` | TypeScript の設定 |
-| `tsconfig.test.json` | テストを含めて型チェックするときの設定 |
 
 ## 使用ライブラリ
 
-- [three.js](https://threejs.org/) 0.156
+- [three.js](https://threejs.org/) 0.186
   - `GLTFLoader`：GLB モデルの読み込み
   - `OrbitControls`：視点の操作
   - `OBB`：有向バウンディングボックスと衝突判定
+- [Vite](https://vite.dev/)：開発サーバーとビルド
+- [Vitest](https://vitest.dev/)：テスト
