@@ -5,13 +5,17 @@ import { OBB } from 'three/examples/jsm/math/OBB';
 
 (async () => {
   let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer;
-  let texturedCube: THREE.Mesh, loadedModel: GLTF, plane: THREE.Mesh;
+  let loadedModel: GLTF, plane: THREE.Mesh;
   let modelGroup: THREE.Group, controls: OrbitControls;
   let gridHelper: THREE.GridHelper, axesHelper: THREE.AxesHelper;
   let light: THREE.DirectionalLight, ambient: THREE.AmbientLight;
-  let obb: OBB;
-  let obbHelper: THREE.Box3Helper;
+  let obb_: OBB;
+  let obbHelper: THREE.Mesh;
   let sphere: THREE.Mesh;
+  const smallSpheres: { mesh: THREE.Mesh, boundingSphere: THREE.Sphere }[] = [];
+  const worldOBB = new OBB();
+
+  let testBox: THREE.Mesh;
 
   /**
    * シーンを初期化します。
@@ -30,11 +34,10 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     loadedModel = await loadModel();
 
     // モデルがロードされた後にOBBを作成
-    [obb, obbHelper] = createOBB(loadedModel);
+    [obb_, obbHelper] = createOBB(loadedModel);
 
     modelGroup = new THREE.Group();
     modelGroup.add(loadedModel.scene, obbHelper);
-    modelGroup.userData.obb = obb;
 
     scene.add(modelGroup);
 
@@ -64,14 +67,43 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     // 球体を作成
     const geometry = new THREE.SphereGeometry(1, 32, 32);
     const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    geometry.computeBoundingSphere();
 
     sphere = new THREE.Mesh(geometry, material);
     sphere.castShadow = true;
 
-    sphere.userData.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
-
-    sphere.position.y = 30;
+    sphere.position.y = 10;
     scene.add(sphere);
+
+    // キューブに沿って小さい球を10x10x10個追加
+    // 小球は静止しているので、ワールド座標のバウンディングスフィアをここで一度だけ計算しておく
+    const smallSphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+    smallSphereGeometry.computeBoundingSphere();
+    const spacing = 10; // 球と球の間のスペース
+    for (let i = 0; i < 10; i++) {
+      for (let j = 0; j < 10; j++) {
+        for (let k = 0; k < 10; k++) {
+          const smallSphere = createSmallSphere(
+            smallSphereGeometry,
+            -5 + i * spacing,
+            -5 + j * spacing + 10 / 2,
+            -5 + k * spacing
+          );
+          scene.add(smallSphere);
+          smallSphere.updateMatrixWorld();
+          smallSpheres.push({
+            mesh: smallSphere,
+            boundingSphere: smallSphereGeometry.boundingSphere!.clone().applyMatrix4(smallSphere.matrixWorld),
+          });
+        }
+      }
+    }
+
+    // 毎フレーム modelGroup のワールド行列をそのまま使うので自動更新は止めておく
+    testBox = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshLambertMaterial({color: 0xff0000}));
+    testBox.matrixAutoUpdate = false;
+
+    scene.add(testBox);
   };
 
   /**
@@ -135,14 +167,22 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     const model = await new Promise<GLTF>((resolve) =>
       loader.load(
         "./ennchuBaoundingBox.glb",
+        // "./BlackCho.glb",
         (object) => resolve(object),
         undefined,
         (error) => console.log(error)
       )
     );
 
+    model.scene.position.x = 50;
+
+    const material = new THREE.MeshBasicMaterial({wireframe: true, color: 0xff00ff});
+
     model.scene.traverse((child: THREE.Object3D) => {
-      child.castShadow = true;
+      if (child instanceof THREE.Mesh) {
+        child.material = material;
+        child.castShadow = true;
+      }
     });
 
     model.scene.scale.set(50, 50, 50);
@@ -150,13 +190,35 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     return model;
   };
 
-  const createOBB = (model: GLTF): [OBB, THREE.Box3Helper] => {
-    const box = new THREE.Box3();
-    const group = model.scene;
-    box.setFromObject(group);
+  const createBoxFromBox3 = (box3: THREE.Box3): THREE.Mesh => {
+    // Box3 のサイズと中心を計算
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box3.getSize(size);
+    box3.getCenter(center);
+
+    // Box の Geometry を作成
+    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z, 100);
+
+    // Box の Material を作成（任意の色やテクスチャを設定できる）
+    const material = new THREE.MeshLambertMaterial({ color: 0xffff00, wireframe: true });
+
+    // Box の Mesh を作成
+    const boxMesh = new THREE.Mesh(geometry, material);
+
+    // Mesh の位置を Box3 の中心に設定
+    boxMesh.position.copy(center);
+
+    return boxMesh;
+  };
+
+  const createOBB = (model: GLTF): [OBB, THREE.Mesh] => {
+    const box3 = new THREE.Box3();
+    box3.setFromObject(model.scene);
+
     const obb = new OBB();
-    obb.fromBox3(box);
-    const helper = new THREE.Box3Helper(box, new THREE.Color(0xffff00)); // 0xffff00 は黄色
+    obb.fromBox3(box3);
+    const helper = createBoxFromBox3(box3);
 
     return [obb, helper];
   };
@@ -186,20 +248,15 @@ import { OBB } from 'three/examples/jsm/math/OBB';
   // 球体の移動速度
   let speed = 0.5;
 
-  // Matrix4 を作成
-  const rotationMatrix4 = new THREE.Matrix4();
-
-  // X軸を中心に0.001回転
-  rotationMatrix4.makeRotationAxis(new THREE.Vector3(1, 0, 0), 0.001);
-
-  // Y軸を中心に0.001回転
-  rotationMatrix4.makeRotationAxis(new THREE.Vector3(0, 1, 0), 0.001);
-
-  // Z軸を中心に0.001回転
-  rotationMatrix4.makeRotationAxis(new THREE.Vector3(0, 0, 1), 0.001);
-
-  // Matrix4 を Matrix3 に変換
-  const rotationMatrix3 = new THREE.Matrix3().setFromMatrix4(rotationMatrix4);
+  // 小さい球を作成する関数
+  // 色を個別に変えるのでマテリアルは球ごとに作り、ジオメトリは共有する
+  const createSmallSphere = (geometry: THREE.SphereGeometry, x: number, y: number, z: number): THREE.Mesh => {
+    const sphereMaterial = new THREE.MeshPhongMaterial({ color: "blue" });
+    const sphere = new THREE.Mesh(geometry, sphereMaterial);
+    sphere.position.set(x, y, z);
+    sphere.castShadow = true;
+    return sphere;
+  };
 
   /**
    * オブジェクトをアニメーションさせます。
@@ -217,16 +274,26 @@ import { OBB } from 'three/examples/jsm/math/OBB';
     modelGroup.rotation.x += 0.001;
     modelGroup.rotation.y += 0.001;
     modelGroup.rotation.z += 0.001;
+    // 描画前なので、回転を反映したワールド行列をここで計算しておく
+    modelGroup.updateMatrixWorld();
 
-    modelGroup.userData.obb.applyMatrix4(modelGroup.matrixWorld);
+    testBox.matrix.copy(modelGroup.matrixWorld);
 
-    sphere.userData.boundingSphere.center.copy(sphere.position);
+    worldOBB.copy(obb_).applyMatrix4(modelGroup.matrixWorld);
 
-    if (modelGroup.userData.obb.intersectsSphere(sphere.userData.boundingSphere)) {
+    if (worldOBB.containsPoint(sphere.position)) {
       (sphere.material as THREE.MeshBasicMaterial).color.set(0xff0000);
     } else {
       (sphere.material as THREE.MeshBasicMaterial).color.set(0x00ff00);
     }
+
+    smallSpheres.forEach(({ mesh, boundingSphere }) => {
+      if (worldOBB.intersectsSphere(boundingSphere)) {
+        (mesh.material as THREE.MeshPhongMaterial).color.set(0xff0000); // 衝突した場合、球の色を赤に変更
+      } else {
+        (mesh.material as THREE.MeshPhongMaterial).color.set(0x0000ff); // 衝突していない場合、球の色を青に戻す
+      }
+    });
   };
 
   window.onresize = handleResize;
