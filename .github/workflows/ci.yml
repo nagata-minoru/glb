@@ -1,4 +1,4 @@
-# PR と main への push のたびに、型チェックとビルドが通るかを確認する
+# PR と main への push のたびに、型チェック・テスト・ビルドが通るかを確認する
 name: CI
 
 on:
@@ -23,7 +23,10 @@ jobs:
       - run: npm ci
 
       - name: 型チェック
-        run: npx tsc --noEmit
+        run: npm run typecheck
+
+      - name: テスト
+        run: npm test
 
       - name: ビルド
-        run: npx webpack
+        run: npm run build

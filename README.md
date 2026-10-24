@@ -26,7 +26,7 @@ npm install
 ## ビルド
 
 ```sh
-npx webpack
+npm run build
 ```
 
 `src/index.ts` がバンドルされ、`dist/main.js` に出力されます。`dist/main.js` もリポジトリで管理しています。
@@ -34,8 +34,18 @@ npx webpack
 型チェックだけを行う場合は次のコマンドを使います。
 
 ```sh
-npx tsc --noEmit
+npm run typecheck
 ```
+
+## テスト
+
+```sh
+npm test
+```
+
+`src/collision.ts`（OBB の作成、ワールド座標への変換、球の配置、往復運動）のテストを、Node.js 標準のテストランナー（`node --test`）で実行します。テストは `test/` にあります。
+
+PR と `main` への push のたびに、GitHub Actions で型チェック・テスト・ビルドを実行します（`.github/workflows/ci.yml`）。
 
 ## 実行
 
@@ -48,11 +58,14 @@ VS Code の Live Server を使う場合は、`index.html` を開いて「Go Live
 | パス | 内容 |
 |---|---|
 | `src/index.ts` | シーンの構築、アニメーション、衝突判定 |
+| `src/collision.ts` | OBB や球の配置など、描画に依存しない計算 |
+| `test/` | テスト |
 | `dist/main.js` | ビルド結果 |
 | `index.html` | `dist/main.js` を読み込むページ |
 | `ennchuBaoundingBox.glb` | 表示する GLB モデル |
 | `webpack.config.js` | webpack の設定（ts-loader を使用） |
 | `tsconfig.json` | TypeScript の設定 |
+| `tsconfig.test.json` | テストを含めて型チェックするときの設定 |
 
 ## 使用ライブラリ
 

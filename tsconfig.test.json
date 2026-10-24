@@ -1,0 +1,10 @@
+{
+  // テストは Node が TypeScript をそのまま実行するので、import に .ts を付けられるようにする
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}
