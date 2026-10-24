@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { OBB } from 'three/addons/math/OBB.js';
+import { createOBBFromObject, gridPositions, stepPingPong, toWorldOBB } from './collision';
 
 (async () => {
   let scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer;
@@ -79,25 +80,15 @@ import { OBB } from 'three/addons/math/OBB.js';
     // 小球は静止しているので、ワールド座標のバウンディングスフィアをここで一度だけ計算しておく
     const smallSphereGeometry = new THREE.SphereGeometry(1, 32, 32);
     smallSphereGeometry.computeBoundingSphere();
-    const spacing = 10; // 球と球の間のスペース
-    for (let i = 0; i < 10; i++) {
-      for (let j = 0; j < 10; j++) {
-        for (let k = 0; k < 10; k++) {
-          const smallSphere = createSmallSphere(
-            smallSphereGeometry,
-            -5 + i * spacing,
-            -5 + j * spacing + 10 / 2,
-            -5 + k * spacing
-          );
-          scene.add(smallSphere);
-          smallSphere.updateMatrixWorld();
-          smallSpheres.push({
-            mesh: smallSphere,
-            boundingSphere: smallSphereGeometry.boundingSphere!.clone().applyMatrix4(smallSphere.matrixWorld),
-          });
-        }
-      }
-    }
+    gridPositions(10, 10, new THREE.Vector3(-5, 0, -5)).forEach((position) => {
+      const smallSphere = createSmallSphere(smallSphereGeometry, position);
+      scene.add(smallSphere);
+      smallSphere.updateMatrixWorld();
+      smallSpheres.push({
+        mesh: smallSphere,
+        boundingSphere: smallSphereGeometry.boundingSphere!.clone().applyMatrix4(smallSphere.matrixWorld),
+      });
+    });
 
     // 毎フレーム modelGroup のワールド行列をそのまま使うので自動更新は止めておく
     testBox = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshLambertMaterial({color: 0xff0000}));
@@ -213,11 +204,7 @@ import { OBB } from 'three/addons/math/OBB.js';
   };
 
   const createOBB = (model: GLTF): [OBB, THREE.Mesh] => {
-    const box3 = new THREE.Box3();
-    box3.setFromObject(model.scene);
-
-    const obb = new OBB();
-    obb.fromBox3(box3);
+    const { obb, box3 } = createOBBFromObject(model.scene);
     const helper = createBoxFromBox3(box3);
 
     return [obb, helper];
@@ -250,10 +237,10 @@ import { OBB } from 'three/addons/math/OBB.js';
 
   // 小さい球を作成する関数
   // 色を個別に変えるのでマテリアルは球ごとに作り、ジオメトリは共有する
-  const createSmallSphere = (geometry: THREE.SphereGeometry, x: number, y: number, z: number): THREE.Mesh => {
+  const createSmallSphere = (geometry: THREE.SphereGeometry, position: THREE.Vector3): THREE.Mesh => {
     const sphereMaterial = new THREE.MeshPhongMaterial({ color: "blue" });
     const sphere = new THREE.Mesh(geometry, sphereMaterial);
-    sphere.position.set(x, y, z);
+    sphere.position.copy(position);
     sphere.castShadow = true;
     return sphere;
   };
@@ -264,11 +251,7 @@ import { OBB } from 'three/addons/math/OBB.js';
    */
   const animateObjects = () => {
     // 球体を左右に動かす
-    xPosition += speed;
-    if (xPosition > 150 || xPosition < -150) {
-      // 範囲外に出たら速度を反転
-      speed *= -1;
-    }
+    ({ position: xPosition, speed } = stepPingPong(xPosition, speed, 150));
     sphere.position.x = xPosition;
 
     modelGroup.rotation.x += 0.001;
@@ -279,7 +262,7 @@ import { OBB } from 'three/addons/math/OBB.js';
 
     testBox.matrix.copy(modelGroup.matrixWorld);
 
-    worldOBB.copy(obb_).applyMatrix4(modelGroup.matrixWorld);
+    toWorldOBB(worldOBB, obb_, modelGroup.matrixWorld);
 
     if (worldOBB.containsPoint(sphere.position)) {
       (sphere.material as THREE.MeshBasicMaterial).color.set(0xff0000);
