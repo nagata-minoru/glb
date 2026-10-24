@@ -1,8 +1,8 @@
-import { describe, test } from 'node:test';
+import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { OBB } from 'three/addons/math/OBB.js';
-import { createOBBFromObject, gridPositions, stepPingPong, toWorldOBB } from '../src/collision.ts';
+import { createOBBFromObject, gridPositions, stepPingPong, toWorldOBB } from '../src/collision';
 
 // 原点を中心に、x 方向に長い 10x2x2 の箱
 const createLongBox = () => new THREE.Mesh(new THREE.BoxGeometry(10, 2, 2));
