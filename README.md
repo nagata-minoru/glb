@@ -14,7 +14,7 @@ three.js で GLB モデルを読み込み、そのモデルを囲む OBB（Orien
 
 ## 必要な環境
 
-- Node.js 26.12.1（`.nvmrc` と `.tool-versions` で指定しています）
+- Node.js 26.13.1（`.nvmrc` と `.tool-versions` で指定しています）
 
 ## セットアップ
 
